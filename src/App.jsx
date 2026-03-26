@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyM7LEvsI05_EFvEUaf8WYMNMXPE4K9HWsTSyOWxma0141zgrLW1ikT6LogzFld3Rp7oQ/exec";
+const SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbyM7LEvsI05_EFvEUaf8WYMNMXPE4K9HWsTSyOWxma0141zgrLW1ikT6LogzFld3Rp7oQ/exec";
 
 const ORCHARD_DATA = {
   Grove: {
@@ -88,10 +89,21 @@ const C = {
   greenSoft: "#e7f7f1",
 };
 
+const LIVE_SUMMARY_STORAGE_KEY = "hansen-apple-bin-tally-live-summary";
+const LIVE_SUMMARY_DATE_KEY = "hansen-apple-bin-tally-live-summary-date";
+
 function makeEntryId() {
   const n = new Date();
   const p = (x) => String(x).padStart(2, "0");
-  return `${n.getFullYear()}${p(n.getMonth() + 1)}${p(n.getDate())}-${p(n.getHours())}${p(n.getMinutes())}${p(n.getSeconds())}`;
+  return `${n.getFullYear()}${p(n.getMonth() + 1)}${p(n.getDate())}-${p(
+    n.getHours()
+  )}${p(n.getMinutes())}${p(n.getSeconds())}`;
+}
+
+function getLocalDateKey() {
+  const now = new Date();
+  const p = (x) => String(x).padStart(2, "0");
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
 function StepBadge({ active, done, label, step }) {
@@ -202,6 +214,28 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    const todayKey = getLocalDateKey();
+    const storedDate = localStorage.getItem(LIVE_SUMMARY_DATE_KEY);
+    const storedEntries = localStorage.getItem(LIVE_SUMMARY_STORAGE_KEY);
+
+    if (storedDate === todayKey && storedEntries) {
+      try {
+        setSavedEntries(JSON.parse(storedEntries));
+      } catch {
+        localStorage.removeItem(LIVE_SUMMARY_STORAGE_KEY);
+      }
+    } else {
+      localStorage.setItem(LIVE_SUMMARY_DATE_KEY, todayKey);
+      localStorage.removeItem(LIVE_SUMMARY_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(LIVE_SUMMARY_DATE_KEY, getLocalDateKey());
+    localStorage.setItem(LIVE_SUMMARY_STORAGE_KEY, JSON.stringify(savedEntries));
+  }, [savedEntries]);
+
   const orchardNames = Object.keys(ORCHARD_DATA);
   const orchardBlocks = orchard ? Object.keys(ORCHARD_DATA[orchard].blocks) : [];
 
@@ -302,7 +336,9 @@ export default function App() {
       setCurrentLines([]);
       setNotes("");
       setMessage(
-        `Saved ${data.rowsSaved} row${data.rowsSaved === 1 ? "" : "s"} to Google Sheets.`
+        `Submission complete. Saved ${data.rowsSaved} row${
+          data.rowsSaved === 1 ? "" : "s"
+        } to Google Sheets. Click here to make a new submission.`
       );
       setStep(1);
     } catch (err) {
@@ -356,9 +392,30 @@ export default function App() {
               padding: 14,
               borderRadius: 16,
               marginBottom: 16,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
             }}
           >
-            {message}
+            <span>{message}</span>
+
+            <button
+              onClick={() => {
+                setOrchard("");
+                setSelectedBlocks([]);
+                setSelectedVarieties([]);
+                setCurrentLines([]);
+                setNotes("");
+                setUserName("");
+                setStep(1);
+                setMessage("");
+              }}
+              style={secondaryButton}
+            >
+              Make new submission
+            </button>
           </div>
         ) : null}
 
@@ -653,6 +710,7 @@ export default function App() {
                       setSelectedBlocks([]);
                       setSelectedVarieties([]);
                       setStep(1);
+                      setMessage("Submission cancelled. Ready for a new submission.");
                     }}
                     style={secondaryButton}
                   >
